@@ -1,4 +1,4 @@
-# Bright Idea Workshop
+# ResciShu
 
 Build an app that
 
