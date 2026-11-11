@@ -56,7 +56,7 @@ function GroceryPage() {
 
   async function runGenerate() {
     const picks = Object.entries(gen ?? {}).filter(([, s]) => s > 0).map(([id, servings]) => ({ recipe: recipes.find((r) => r.id === id)!, servings }));
-    if (!picks.length) return toast.error("Pick at least one recipe.");
+    if (!picks.length) return void toast.error("Pick at least one recipe.");
     try {
       const id = listId ?? (await newList());
       const n = await generateIntoList(id, picks, inv, ingredients, map);

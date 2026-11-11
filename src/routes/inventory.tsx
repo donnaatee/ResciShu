@@ -67,14 +67,14 @@ function InventoryPage() {
   }, [filtered]);
 
   function total(rows: InventoryItem[]) {
-    const target = map.get(rows[0].ingredient?.default_unit ?? rows[0].unit) ?? map.get(rows[0].unit);
+    const target = map.get(rows[0]!.ingredient?.default_unit ?? rows[0]!.unit) ?? map.get(rows[0]!.unit);
     let sum = 0;
     for (const r of rows) { const u = map.get(r.unit); const c = u && target ? convert(Number(r.quantity), u, target) : null; if (c == null) return null; sum += c; }
     return `${formatQty(sum)} ${target?.label ?? ""}`;
   }
 
   async function save(d: Draft, force = false) {
-    if (!d.ingredient_id || !d.unit || d.quantity === "") return toast.error("Pick an ingredient, quantity and unit.");
+    if (!d.ingredient_id || !d.unit || d.quantity === "") return void toast.error("Pick an ingredient, quantity and unit.");
     const existing = inv.find((i) => i.ingredient_id === d.ingredient_id && i.location === d.location && i.id !== d.id);
     if (existing && !force) { setDupe(existing); return; }
     try {
@@ -131,8 +131,8 @@ function InventoryPage() {
           view === "ingredient" ? (
             <ul className="divide-y divide-border">
               {grouped.map((rows) => (
-                <li key={rows[0].ingredient_id} className="py-3">
-                  <div className="flex items-center justify-between"><span className="font-display text-lg font-bold capitalize">{rows[0].ingredient?.name}</span><span className="text-sm font-semibold">{total(rows) ?? "Mixed units"} total</span></div>
+                <li key={rows[0]!.ingredient_id} className="py-3">
+                  <div className="flex items-center justify-between"><span className="font-display text-lg font-bold capitalize">{rows[0]!.ingredient?.name}</span><span className="text-sm font-semibold">{total(rows) ?? "Mixed units"} total</span></div>
                   <ul className="divide-y divide-border pl-3">{rows.map((r) => row(r))}</ul>
                 </li>
               ))}
