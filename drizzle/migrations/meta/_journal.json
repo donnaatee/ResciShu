@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794409873874,
+      "tag": "0000_kitchen_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794409888922,
+      "tag": "0001_recipe_photo_policies",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+CREATE POLICY "recipe photos open" ON storage.objects FOR ALL TO anon, authenticated USING (bucket_id = 'recipe-photos') WITH CHECK (bucket_id = 'recipe-photos');
