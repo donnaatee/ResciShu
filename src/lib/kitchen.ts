@@ -32,7 +32,7 @@ export function availability(need: Need, inventory: InvRow[], unitMap: Map<strin
 }
 
 export interface IngredientInfo { id: string; name: string; default_unit: string; est_price: number | null; est_price_unit: string | null; is_staple: boolean }
-export interface GroceryLine { ingredient_id: string; name: string; quantity: number | null; unit: string; estimated_price: number | null; note?: string }
+export interface GroceryLine { ingredient_id: string; name: string; quantity: number | null; unit: string; estimated_price: number | null; note?: string | undefined }
 
 /** recipes: each with servings wanted and its ingredient list (already at original servings). */
 export function buildGroceryList(

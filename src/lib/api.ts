@@ -35,13 +35,13 @@ export async function createIngredient(name: string, default_unit: string, categ
 }
 export async function updateIngredient(id: string, patch: Partial<Ingredient>) { ok(await supabase.from("ingredients").update(patch).eq("id", id)); }
 
-export async function upsertInventory(row: Omit<InventoryItem, "id" | "ingredient"> & { id?: string }) {
+export async function upsertInventory(row: Omit<InventoryItem, "id" | "ingredient"> & { id?: string | undefined }) {
   if (row.id) { const { id, ...rest } = row; ok(await supabase.from("inventory").update(rest).eq("id", id)); }
   else ok(await supabase.from("inventory").insert(row));
 }
 export async function deleteInventory(id: string) { ok(await supabase.from("inventory").delete().eq("id", id)); }
 
-export async function saveRecipe(r: Omit<Recipe, "id" | "recipe_ingredients"> & { id?: string }, items: RecipeIngredient[]) {
+export async function saveRecipe(r: Omit<Recipe, "id" | "recipe_ingredients"> & { id?: string | undefined }, items: RecipeIngredient[]) {
   const { id, ...fields } = r;
   let recipeId = id;
   if (id) ok(await supabase.from("recipes").update(fields).eq("id", id));
@@ -74,8 +74,8 @@ export async function replaceGeneratedItems(listId: string, items: Omit<GroceryI
   ok(await supabase.from("grocery_list_items").delete().eq("grocery_list_id", listId).eq("added_manually", false));
   if (items.length) ok(await supabase.from("grocery_list_items").insert(items.map((i) => ({ ...i, grocery_list_id: listId, added_manually: false }))));
 }
-export async function addGroceryItem(row: Partial<GroceryItem> & { grocery_list_id: string }) { ok(await supabase.from("grocery_list_items").insert({ ...row, added_manually: true })); }
-export async function updateGroceryItem(id: string, patch: Partial<GroceryItem>) { ok(await supabase.from("grocery_list_items").update(patch).eq("id", id)); }
+export async function addGroceryItem(row: Partial<Omit<GroceryItem, "ingredient">> & { grocery_list_id: string }) { ok(await supabase.from("grocery_list_items").insert({ ...row, added_manually: true })); }
+export async function updateGroceryItem(id: string, patch: Partial<Omit<GroceryItem, "ingredient">>) { ok(await supabase.from("grocery_list_items").update(patch).eq("id", id)); }
 export async function deleteGroceryItem(id: string) { ok(await supabase.from("grocery_list_items").delete().eq("id", id)); }
 export async function updateGroceryList(id: string, patch: Partial<GroceryList>) { ok(await supabase.from("grocery_lists").update(patch).eq("id", id)); }
 export async function deleteGroceryList(id: string) { ok(await supabase.from("grocery_lists").delete().eq("id", id)); }

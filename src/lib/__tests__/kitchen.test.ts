@@ -40,8 +40,8 @@ describe("buildGroceryList", () => {
     const r = { servings: 4, wanted: 4, items: [{ ingredient_id: "p", quantity: 1, unit: "lb" }] };
     const out = buildGroceryList([r, r], [{ ingredient_id: "p", quantity: 0.5, unit: "lb", location: "pantry" }], ings, um);
     expect(out).toHaveLength(1);
-    expect(out[0].quantity).toBe(1.5);
-    expect(out[0].estimated_price).toBe(4.5);
+    expect(out[0]!.quantity).toBe(1.5);
+    expect(out[0]!.estimated_price).toBe(4.5);
   });
   it("fully stocked items excluded", () => {
     const r = { servings: 4, wanted: 4, items: [{ ingredient_id: "p", quantity: 1, unit: "lb" }] };

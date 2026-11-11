@@ -37,8 +37,8 @@ export function RecipeForm({ recipe }: { recipe?: Recipe }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!f.name.trim()) return toast.error("Give the recipe a name.");
-    if (items.some((i) => !i.ingredient_id)) return toast.error("Pick an ingredient for every row.");
+    if (!f.name.trim()) return void toast.error("Give the recipe a name.");
+    if (items.some((i) => !i.ingredient_id)) return void toast.error("Pick an ingredient for every row.");
     setBusy(true);
     try {
       const id = await saveRecipe({
@@ -99,8 +99,8 @@ export function RecipeForm({ recipe }: { recipe?: Recipe }) {
               <span className="mt-2 grid size-6 shrink-0 place-items-center rounded-full bg-secondary text-xs font-bold">{i + 1}</span>
               <Textarea rows={2} value={s} onChange={(e) => setSteps(steps.map((x, j) => (j === i ? e.target.value : x)))} />
               <div className="flex flex-col">
-                <Button type="button" size="icon" variant="ghost" aria-label="Up" disabled={i === 0} onClick={() => { const n = [...steps]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setSteps(n); }}><ArrowUp /></Button>
-                <Button type="button" size="icon" variant="ghost" aria-label="Down" disabled={i === steps.length - 1} onClick={() => { const n = [...steps]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; setSteps(n); }}><ArrowDown /></Button>
+                <Button type="button" size="icon" variant="ghost" aria-label="Up" disabled={i === 0} onClick={() => { const n = [...steps]; [n[i - 1], n[i]] = [n[i]!, n[i - 1]!]; setSteps(n); }}><ArrowUp /></Button>
+                <Button type="button" size="icon" variant="ghost" aria-label="Down" disabled={i === steps.length - 1} onClick={() => { const n = [...steps]; [n[i + 1], n[i]] = [n[i]!, n[i + 1]!]; setSteps(n); }}><ArrowDown /></Button>
               </div>
               <Button type="button" size="icon" variant="ghost" aria-label="Remove step" onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Trash2 /></Button>
             </li>
