@@ -39,6 +39,7 @@ export async function upsertInventory(row: Omit<InventoryItem, "id" | "ingredien
   if (row.id) { const { id, ...rest } = row; ok(await supabase.from("inventory").update(rest).eq("id", id)); }
   else ok(await supabase.from("inventory").insert(row));
 }
+export async function setInventoryQuantity(id: string, quantity: number) { ok(await supabase.from("inventory").update({ quantity }).eq("id", id)); }
 export async function deleteInventory(id: string) { ok(await supabase.from("inventory").delete().eq("id", id)); }
 
 export async function saveRecipe(r: Omit<Recipe, "id" | "recipe_ingredients"> & { id?: string | undefined }, items: RecipeIngredient[]) {

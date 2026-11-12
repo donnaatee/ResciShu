@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarDays, ChefHat, Clock, Refrigerator, ShoppingBasket } from "lucide-react";
 import { PageHeader } from "@/components/AppShell";
+import { ThawReminders } from "@/components/ThawReminders";
 import { Badge } from "@/components/ui/badge";
 import { groceryListsQuery, inventoryQuery, mealPlansQuery, recipesQuery } from "@/lib/api";
 import { daysUntil, todayStr } from "@/lib/kitchen";
@@ -50,6 +51,7 @@ function Dashboard() {
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <ThawReminders inventory={inv} recipes={recipes} meals={meals} />
         <section className="card-soft p-5">
           <h2 className="flex items-center gap-2 text-lg font-bold"><AlertTriangle className="size-4 text-accent" />Low stock</h2>
           {low.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Everything's well stocked.</p> : (
