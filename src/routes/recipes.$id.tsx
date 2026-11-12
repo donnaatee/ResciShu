@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Clock, Minus, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ArrowLeft, ChefHat, Clock, Minus, Pencil, Plus, Timer, Trash2, Users } from "lucide-react";
+import { CookMode, unlockSpeech } from "@/components/CookMode";
 import { RecipePhoto } from "@/components/RecipePhoto";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { deleteRecipe, inventoryQuery, recipesQuery, useInvalidate } from "@/lib/api";
 import { useUnitMap } from "@/lib/hooks";
 import { availability, scale } from "@/lib/kitchen";
+import { parseDurations } from "@/lib/timers";
 import { formatQty, toSystem } from "@/lib/units";
 
 export const Route = createFileRoute("/recipes/$id")({
@@ -31,6 +33,7 @@ function RecipeDetail() {
   const recipe = data?.find((r) => r.id === id);
   const [servings, setServings] = useState<number | null>(null);
   const [metric, setMetric] = useState(false);
+  const [cooking, setCooking] = useState(false);
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
   if (!recipe) return <p>Recipe not found. <Link to="/recipes" className="text-primary underline">Back to recipes</Link></p>;
   const s = servings ?? Number(recipe.servings);
@@ -85,14 +88,28 @@ function RecipeDetail() {
           </ul>
         </section>
         <section className="card-soft p-5">
-          <h2 className="mb-3 text-xl font-bold">Steps</h2>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-xl font-bold">Steps</h2>
+            {recipe.instructions.length > 0 && (
+              <Button variant="accent" onClick={() => { unlockSpeech(); setCooking(true); }}><ChefHat />Start cooking</Button>
+            )}
+          </div>
           <ol className="grid gap-4">
             {recipe.instructions.map((st, i) => (
-              <li key={i} className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-accent-foreground">{i + 1}</span><p className="pt-0.5">{st}</p></li>
+              <li key={i} className="flex gap-3">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-accent-foreground">{i + 1}</span>
+                <div className="pt-0.5">
+                  <p>{st}</p>
+                  {parseDurations(st).map((t, k) => (
+                    <span key={k} className="mt-1 mr-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"><Timer className="size-3" />{t.label}</span>
+                  ))}
+                </div>
+              </li>
             ))}
           </ol>
         </section>
       </div>
+      {cooking && <CookMode recipeName={recipe.name} steps={recipe.instructions} onClose={() => setCooking(false)} />}
     </article>
   );
 }
