@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 
 /**
- * Reads a receipt photo with Google Gemini.
- * This runs on the server, so your GEMINI_API_KEY is never sent to the browser.
+ * Reads a receipt photo with Lovable's built-in AI (Lovable AI gateway).
+ * This runs on the server, so the project's LOVABLE_API_KEY is never sent to the browser.
+ * Each scan uses a little of the workspace's monthly AI allowance.
  */
 
 export interface ScannedItem {
@@ -20,34 +21,13 @@ interface ScanInput { image: string; mimeType: string; ingredients: string[]; st
 
 const UNITS = ["lb", "oz", "g", "kg", "cup", "fl_oz", "ml", "l", "piece", "can", "bunch"];
 
-const SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    store: { type: "STRING" },
-    date: { type: "STRING" },
-    total: { type: "NUMBER", nullable: true },
-    items: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          receipt_text: { type: "STRING" },
-          name: { type: "STRING" },
-          quantity: { type: "NUMBER", nullable: true },
-          unit: { type: "STRING", enum: UNITS, nullable: true },
-          total_price: { type: "NUMBER", nullable: true },
-          ingredient: { type: "STRING" },
-          is_food: { type: "BOOLEAN" },
-        },
-        required: ["receipt_text", "name", "quantity", "unit", "total_price", "ingredient", "is_food"],
-      },
-    },
-  },
-  required: ["store", "date", "total", "items"],
-};
+const SHAPE = `{"store": string, "date": string, "total": number | null, "items": [{"receipt_text": string, "name": string, "quantity": number | null, "unit": ${UNITS.map((u) => `"${u}"`).join(" | ")} | null, "total_price": number | null, "ingredient": string, "is_food": boolean}]}`;
+
+/** Models to try, in order. Set LOVABLE_AI_MODEL to pick a different one. */
+const MODELS = ["google/gemini-3-flash-preview", "google/gemini-3.7-flash", "google/gemini-2.5-flash"];
 
 function prompt(ingredients: string[], stores: string[]) {
-  return `You read photos of grocery receipts. Return one JSON object.
+  return `You read photos of grocery receipts. Reply with only one JSON object shaped like this:\n${SHAPE}
 
 store: the store's everyday name (e.g. "Key Food", not "KEY FOOD #1234 BROOKLYN NY"). If it is one of these stores I've used before, spell it exactly the same: ${JSON.stringify(stores)}.
 date: purchase date as YYYY-MM-DD, or "" if you can't read it.
@@ -73,26 +53,36 @@ export const scanReceipt = createServerFn({ method: "POST" })
     return { image: d.image, mimeType: d.mimeType, ingredients: (d.ingredients ?? []).slice(0, 500), stores: (d.stores ?? []).slice(0, 50) };
   })
   .handler(async ({ data }): Promise<ScannedReceipt> => {
-    const key = process.env["GEMINI_API_KEY"];
-    if (!key) throw new Error("Receipt scanning isn't set up yet. Add your GEMINI_API_KEY in Lovable → Secrets.");
-    const model = process.env["GEMINI_MODEL"] || "gemini-3.6-flash";
+    const key = process.env["LOVABLE_API_KEY"];
+    if (!key) throw new Error("Receipt scanning isn't set up yet. Turn on Lovable AI for this project in Lovable.");
+    const chosen = process.env["LOVABLE_AI_MODEL"];
+    const models = chosen ? [chosen, ...MODELS.filter((m) => m !== chosen)] : MODELS;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        contents: [{ parts: [{ inline_data: { mime_type: data.mimeType, data: data.image } }, { text: prompt(data.ingredients, data.stores) }] }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0 },
-      }),
-    });
-    const body = (await res.json().catch(() => null)) as
-      | { error?: { message?: string; status?: string }; candidates?: { content?: { parts?: { text?: string }[] } }[] }
-      | null;
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Gemini's free limit was reached. Wait a minute and try again.");
-      throw new Error(`Gemini couldn't read the receipt: ${body?.error?.message ?? res.statusText}`);
+    let text = "";
+    for (const model of models) {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          messages: [{ role: "user", content: [
+            { type: "text", text: prompt(data.ingredients, data.stores) },
+            { type: "image_url", image_url: { url: `data:${data.mimeType};base64,${data.image}` } },
+          ] }],
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { error?: { message?: string } | string; choices?: { message?: { content?: string } }[] }
+        | null;
+      const message = typeof body?.error === "string" ? body.error : body?.error?.message ?? res.statusText;
+      if (res.ok) { text = body?.choices?.[0]?.message?.content ?? ""; break; }
+      if (res.status === 402) throw new Error("This month's free Lovable AI allowance is used up. Scanning works again when it resets, or add credits in Lovable.");
+      if (res.status === 429) throw new Error("Too many scans at once. Wait a minute and try again.");
+      if ((res.status === 400 || res.status === 404) && /model/i.test(message) && model !== models[models.length - 1]) continue; // try the next model
+      throw new Error(`Couldn't read the receipt: ${message}`);
     }
-    const text = body?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
     let parsed: Partial<ScannedReceipt>;
     try { parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")) as Partial<ScannedReceipt>; }
     catch { throw new Error("Couldn't read that receipt. Try a sharper, flatter photo."); }
