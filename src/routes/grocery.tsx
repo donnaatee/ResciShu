@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Archive, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Plus, Receipt, Scale, Sparkles, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/AppShell";
 import { UnitSelect } from "@/components/UnitSelect";
@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   addGroceryItem, createGroceryList, deleteGroceryItem, deleteGroceryList, groceryItemsQuery, groceryListsQuery,
-  ingredientsQuery, inventoryQuery, recipesQuery, updateGroceryItem, updateGroceryList, useInvalidate,
+  ingredientsQuery, inventoryQuery, purchasesQuery, recipesQuery, updateGroceryItem, updateGroceryList, useInvalidate, type GroceryItem,
 } from "@/lib/api";
 import { generateIntoList } from "@/lib/generate";
 import { useUnitMap } from "@/lib/hooks";
+import { compareStores, priceAt } from "@/lib/receipts";
 import { formatQty } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ function GroceryPage() {
   const { data: recipes = [] } = useQuery(recipesQuery);
   const { data: inv = [] } = useQuery(inventoryQuery);
   const { data: ingredients = [] } = useQuery(ingredientsQuery);
+  const { data: purchases = [] } = useQuery(purchasesQuery);
   const { map } = useUnitMap();
   const invalidate = useInvalidate();
   const [listId, setListId] = useState<string | null>(null);
@@ -46,8 +48,17 @@ function GroceryPage() {
   const [gen, setGen] = useState<Record<string, number> | null>(null);
   const [manual, setManual] = useState({ name: "", quantity: "", unit: null as string | null, price: "" });
 
-  const total = items.reduce((s, i) => s + (Number(i.estimated_price) || 0), 0);
-  const remaining = items.filter((i) => !i.is_purchased).reduce((s, i) => s + (Number(i.estimated_price) || 0), 0);
+  // "Price at": use your latest receipt price at one store; otherwise the list's usual estimate
+  const [priceStore, setPriceStore] = useState("__usual");
+  const [comparing, setComparing] = useState(false);
+  const stores = [...new Set(purchases.map((p) => p.store))].sort();
+  const storePrice = (i: GroceryItem) => priceStore !== "__usual" && i.ingredient_id && i.quantity && i.unit
+    ? priceAt(i.ingredient_id, Number(i.quantity), i.unit, purchases, map, priceStore) : null;
+  const itemPrice = (i: GroceryItem) => storePrice(i) ?? (i.estimated_price != null ? Number(i.estimated_price) : null);
+  const total = items.reduce((s, i) => s + (itemPrice(i) ?? 0), 0);
+  const remaining = items.filter((i) => !i.is_purchased).reduce((s, i) => s + (itemPrice(i) ?? 0), 0);
+  const toBuy = items.filter((i) => !i.is_purchased);
+  const comparison = comparing ? compareStores(toBuy, purchases, map) : [];
 
   async function newList() {
     const l = await createGroceryList(`Week of ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })}`, "manual");
@@ -81,7 +92,7 @@ function GroceryPage() {
   return (
     <>
       <PageHeader title="Grocery list" subtitle={list ? `${items.filter((i) => !i.is_purchased).length} left · ${money(remaining)} of ${money(total)}` : "Build a list from your recipes"}
-        action={<div className="flex gap-2"><Button variant="outline" onClick={newList}><Plus />New list</Button><Button variant="accent" onClick={() => setGen({})}><Sparkles />From recipes</Button></div>} />
+        action={<div className="flex flex-wrap gap-2"><Button variant="outline" asChild><Link to="/receipt"><Receipt />Scan receipt</Link></Button><Button variant="outline" onClick={newList}><Plus />New list</Button><Button variant="accent" onClick={() => setGen({})}><Sparkles />From recipes</Button></div>} />
 
       {active.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
@@ -91,6 +102,38 @@ function GroceryPage() {
           </Select>
           {list && <Button variant="ghost" size="sm" onClick={async () => { await updateGroceryList(list.id, { status: "archived" }); setListId(null); invalidate("grocery_lists"); }}><Archive />Archive</Button>}
           {list && <Button variant="ghost" size="sm" onClick={async () => { if (confirm("Delete this list?")) { await deleteGroceryList(list.id); setListId(null); invalidate("grocery_lists"); } }}><Trash2 />Delete</Button>}
+        </div>
+      )}
+
+      {list && stores.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Store className="size-4 text-muted-foreground" />
+          <Select value={priceStore} onValueChange={setPriceStore}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__usual">Price at: usual estimate</SelectItem>
+              {stores.map((s) => <SelectItem key={s} value={s}>Price at: {s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {stores.length > 1 && <Button variant="ghost" size="sm" onClick={() => setComparing(!comparing)}><Scale />{comparing ? "Hide comparison" : "Compare stores"}</Button>}
+          <Link to="/prices" className="text-sm text-primary underline">Price history</Link>
+        </div>
+      )}
+      {comparing && (
+        <div className="card-soft mb-4 p-4">
+          <h2 className="mb-2 font-bold">Items left to buy, by store</h2>
+          <ul className="divide-y divide-border text-sm">
+            {comparison.map((c, n) => (
+              <li key={c.store} className="flex items-center justify-between py-2">
+                <span className="font-medium">{c.store}{n === 0 && c.priced > 0 && comparison.length > 1 ? " ⭐" : ""}</span>
+                <span className="text-right">
+                  <b className="tabular-nums">${c.total.toFixed(2)}</b>
+                  <span className="block text-xs text-muted-foreground">{c.priced} priced{c.missing ? ` · ${c.missing} with no price there yet` : ""}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">Based on the latest price you paid at each store. Stores are ranked by how many items they have prices for, then by total.</p>
         </div>
       )}
 
@@ -114,11 +157,14 @@ function GroceryPage() {
                 </div>
                 <Input className="w-20 text-right" type="number" step="any" defaultValue={i.quantity ?? ""} onBlur={async (e) => { await updateGroceryItem(i.id, { quantity: e.target.value === "" ? null : Number(e.target.value) }); invalidate("grocery_items"); }} />
                 <span className="w-12 text-sm text-muted-foreground">{i.unit ? map.get(i.unit)?.label : ""}</span>
-                <span className="w-16 text-right text-sm font-semibold tabular-nums">{i.estimated_price != null ? money(Number(i.estimated_price)) : "—"}</span>
+                <span className="w-16 text-right text-sm font-semibold tabular-nums" title={priceStore !== "__usual" && storePrice(i) == null ? `No price from ${priceStore} yet: usual estimate shown` : undefined}>
+                  {itemPrice(i) != null ? money(itemPrice(i)!) : "—"}{priceStore !== "__usual" && storePrice(i) == null && itemPrice(i) != null ? <span className="text-xs font-normal text-muted-foreground">*</span> : null}
+                </span>
                 <Button size="icon" variant="ghost" aria-label="Remove" onClick={async () => { await deleteGroceryItem(i.id); invalidate("grocery_items"); }}><Trash2 /></Button>
               </li>
             ))}
-            <li className="flex justify-between py-3 font-display text-lg font-bold"><span>Estimated total</span><span>{money(total)}</span></li>
+            <li className="flex justify-between py-3 font-display text-lg font-bold"><span>Estimated total{priceStore !== "__usual" ? ` at ${priceStore}` : ""}</span><span>{money(total)}</span></li>
+            {priceStore !== "__usual" && items.some((i) => storePrice(i) == null) && <li className="pb-3 text-xs text-muted-foreground">* No price from {priceStore} yet, so the usual estimate is used.</li>}
           </ul>
         )}
       </div>

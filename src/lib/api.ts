@@ -1,5 +1,6 @@
 import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Purchase } from "./receipts";
 import type { Unit } from "./units";
 
 // All database access lives here; pages only call these.
@@ -24,6 +25,8 @@ export const groceryListsQuery = queryOptions({ queryKey: ["grocery_lists"], que
 export const groceryItemsQuery = (listId: string) => queryOptions({ queryKey: ["grocery_items", listId], queryFn: async () => ok(await supabase.from("grocery_list_items").select("*, ingredient:ingredients(*)").eq("grocery_list_id", listId).order("created_at")) as GroceryItem[] });
 export const mealPlansQuery = (from: string, to: string) => queryOptions({ queryKey: ["meal_plans", from, to], queryFn: async () => ok(await supabase.from("meal_plans").select("*").gte("plan_date", from).lte("plan_date", to).order("plan_date")) as MealPlan[] });
 
+export const purchasesQuery = queryOptions({ queryKey: ["purchases"], queryFn: async () => ok(await supabase.from("purchase_history").select("*").order("purchase_date", { ascending: false }).order("created_at", { ascending: false })) as Purchase[] });
+
 export function useInvalidate() {
   const qc = useQueryClient();
   return (...keys: string[]) => Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] })));
@@ -40,6 +43,7 @@ export async function upsertInventory(row: Omit<InventoryItem, "id" | "ingredien
   else ok(await supabase.from("inventory").insert(row));
 }
 export async function setInventoryQuantity(id: string, quantity: number) { ok(await supabase.from("inventory").update({ quantity }).eq("id", id)); }
+export async function insertInventoryRow(row: Omit<InventoryItem, "id" | "ingredient">) { return ok(await supabase.from("inventory").insert(row).select().single()) as InventoryItem; }
 export async function deleteInventory(id: string) { ok(await supabase.from("inventory").delete().eq("id", id)); }
 
 export async function saveRecipe(r: Omit<Recipe, "id" | "recipe_ingredients"> & { id?: string | undefined }, items: RecipeIngredient[]) {
@@ -60,6 +64,21 @@ export async function uploadPhoto(file: File): Promise<string> {
   return path;
 }
 export const photoUrlQuery = (path: string) => queryOptions({ queryKey: ["photo", path], staleTime: 50 * 60 * 1000, queryFn: async () => (ok(await supabase.storage.from("recipe-photos").createSignedUrl(path, 3600)) as { signedUrl: string }).signedUrl });
+
+export async function addPurchases(rows: Omit<Purchase, "id" | "created_at">[]) { if (rows.length) ok(await supabase.from("purchase_history").insert(rows)); }
+export async function deleteReceipt(receiptId: string) { ok(await supabase.from("purchase_history").delete().eq("receipt_id", receiptId)); }
+
+/** Shrinks a photo and returns it as base64 JPEG (receipts stay readable at 2000px). */
+export async function photoToBase64(file: File, max = 2000): Promise<{ data: string; mimeType: string }> {
+  const blob = await resizeImage(file, max);
+  const data = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1] ?? "");
+    r.onerror = () => rej(new Error("Couldn't read that photo."));
+    r.readAsDataURL(blob);
+  });
+  return { data, mimeType: "image/jpeg" };
+}
 
 async function resizeImage(file: File, max: number): Promise<Blob> {
   const img = await createImageBitmap(file);

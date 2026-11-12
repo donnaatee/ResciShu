@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, ChefHat, Home, Refrigerator, ShoppingBasket, Scale } from "lucide-react";
+import { CalendarDays, ChefHat, Home, Receipt, Refrigerator, ShoppingBasket, Scale } from "lucide-react";
 import type { ReactNode } from "react";
 
 const NAV = [
@@ -26,6 +26,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
         <div className="mt-auto">
+          <Link to="/prices" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent"
+            activeProps={{ className: "bg-sidebar-accent text-sidebar-foreground" }}>
+            <Receipt className="size-4" />Prices &amp; receipts
+          </Link>
           <Link to="/convert" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent"
             activeProps={{ className: "bg-sidebar-accent text-sidebar-foreground" }}>
             <Scale className="size-4" />Unit converter

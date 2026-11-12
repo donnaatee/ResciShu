@@ -236,6 +236,61 @@ export type Database = {
           },
         ]
       }
+      purchase_history: {
+        Row: {
+          created_at: string
+          id: string
+          ingredient_id: string | null
+          product_name: string
+          purchase_date: string
+          quantity: number | null
+          receipt_id: string
+          store: string
+          total_price: number
+          unit: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ingredient_id?: string | null
+          product_name: string
+          purchase_date: string
+          quantity?: number | null
+          receipt_id: string
+          store: string
+          total_price: number
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ingredient_id?: string | null
+          product_name?: string
+          purchase_date?: string
+          quantity?: number | null
+          receipt_id?: string
+          store?: string
+          total_price?: number
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_history_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_history_unit_fkey"
+            columns: ["unit"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       recipe_ingredients: {
         Row: {
           created_at: string
